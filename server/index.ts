@@ -1,15 +1,40 @@
-const express = require('express');
-const path = require('path');
-const cors = require('cors');
-const router = express.Router();
-const bodyParser = require('body-parser');
-const nodemailer = require('nodemailer');
-const compression = require('compression');
+// Load environment variables from .env file
+require('dotenv').config();
+
+import express from 'express';
+import path from 'path';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import nodemailer from 'nodemailer';
+import compression from 'compression';
+
+// For TypeScript compatibility with Express
+interface EmailRequest {
+  name: string;
+  company?: string;
+  email: string;
+  message: string;
+}
 
 const app = express();
-const port = 8080;
-
-app.use(cors());
+// Use process.env.PORT for Vercel compatibility
+const port = process.env.PORT || 8080;
+console.log('Server is starting...');
+// Configure CORS to allow requests from various origins
+app.use(cors({
+  origin: [
+    'http://localhost:3000', 
+    'http://127.0.0.1:3000', 
+    'https://divsportfolio.netlify.app', 
+    'https://portfolio-website-ten-omega.vercel.app',
+    'https://portfolio-website-yourusername.vercel.app', // Replace with your actual Vercel subdomain
+    'https://your-custom-domain.com', // If you have a custom domain
+    '*'
+  ],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  credentials: true,
+  optionsSuccessStatus: 204
+}));
 app.use(compression());
 
 // Have Node serve the files for our built React app
@@ -21,16 +46,19 @@ app.use(bodyParser.urlencoded({ extended: false }));
 // parse application/json
 app.use(bodyParser.json());
 
-// Handle GET requests to /api route
-app.post('/api/send-email', (req, res) => {
-    const { name, company, email, message } = req.body;
+// Handle OPTIONS requests for CORS preflight
+app.options('/api/send-email', cors());
+
+// Handle POST requests to /api route
+app.post('/api/send-email', (req: express.Request, res: express.Response) => {
+    const { name, company, email, message } = req.body as EmailRequest;
 
     const transporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 587,
         auth: {
-            user: process.env.FOLIO_EMAIL,
-            pass: process.env.FOLIO_PASSWORD,
+            user: process.env.EMAIL,
+            pass: process.env.PASSWORD,
         },
     });
 
@@ -39,29 +67,33 @@ app.post('/api/send-email', (req, res) => {
         .then(() => {
             transporter
                 .sendMail({
-                    from: `"${name}" <henryheffernan.folio@gmail.com>`, // sender address
-                    to: 'henryheffernan@gmail.com, henryheffernan.folio@gmail.com', // list of receivers
+                    from: `"${name}" <diveyammishra@gmail.com>`, // sender address
+                    to: 'mishradiveyam@gmail.com, diveyammishra@gmail.com', // list of receivers
                     subject: `${name} <${email}> ${
                         company ? `from ${company}` : ''
                     } submitted a contact form`, // Subject line
                     text: `${message}`, // plain text body
-                })
-                .then((info) => {
+                })                .then((info: any) => {
                     console.log({ info });
                     res.json({ message: 'success' });
                 })
-                .catch((e) => {
+                .catch((e: Error) => {
                     console.error(e);
-                    res.status(500).send(e);
+                    res.status(500).send(e.message);
                 });
         })
-        .catch((e) => {
+        .catch((e: Error) => {
             console.error(e);
-            res.status(500).send(e);
+            res.status(500).send(e.message);
         });
 });
 
-// listen to app on port 8080
-app.listen(port, () => {
-    console.log(`Server is listening on port ${port}`);
-});
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(port, () => {
+        console.log(`Server is listening on port ${port}`);
+    });
+}
+
+// Export the Express API for Vercel
+export default app;
